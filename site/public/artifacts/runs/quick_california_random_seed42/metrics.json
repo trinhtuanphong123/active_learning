@@ -1,0 +1,1 @@
+[{"iteration":0,"strategy":"random_sampling","num_labeled":8,"num_pool":64,"num_selected":4,"test_rmse":162.91589,"test_mae":116.30473,"mean_test_epistemic_variance":0.01919,"mean_test_aleatoric_variance":1.19687,"mean_pool_epistemic_variance":0.01642,"mean_pool_aleatoric_variance":1.16146,"acquisition_time_seconds":0.00065,"train_time_seconds":0.08974}]

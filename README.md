@@ -1,65 +1,249 @@
-# Active Learning for Bayesian Neural Networks with Gaussian Processes
+# active_learning
 
-This directory contains code for an active learning framework for Bayesian Neural Networks applied to regression tasks, based on a paper by Tsymbalov et al. [1]. It also includes a generalization with faster runtime (the Fast GPA Sampler).
+`active_learning` là pet project để học và trình bày active learning cho bài
+toán regression. Repo này không phải ML production service. Giá trị chính nằm ở
+engine thuật toán, cách đo uncertainty, acquisition strategy, artifact sinh ra
+từ experiment, và một website tĩnh giúp người đọc nhìn được quá trình học.
 
-## (very short) Introduction
+Site trên Render không train model, không gọi API, không import Torch. Toàn bộ
+training chạy offline trước; site chỉ đọc JSON đã build sẵn trong
+`site/public/artifacts/`.
 
-As example data, the housing dataset from sklearn is used, which is a well-known regression problem. The aim is to train a Bayesian Neural Network with low RMSE while minimizing the number of training data points.
+## Mô hình bài toán
 
-After a Bayesian Neural Network is trained on an initial set of points, Active Learning iterations are performed. In each iteration, a Sampler selects points from a pool (without having access to the labels of these points) which then get added to the training data before the training process is resumed.
+Vòng lặp active learning trong repo:
 
-For further details please consider the paper [1].
+1. Chia dataset thành train/pool và test.
+2. Chọn một tập labeled ban đầu.
+3. Train Deep Ensemble trên labeled set.
+4. Dự đoán toàn bộ pool chưa nhãn.
+5. Tính epistemic uncertainty và aleatoric uncertainty.
+6. Acquisition strategy chọn thêm một batch điểm.
+7. Mở nhãn cho batch đó và đưa vào labeled set.
+8. Lặp lại, ghi metrics và artifact cho site.
 
-Two example scripts are provided which showcase:
+Hướng mô hình hiện tại:
 
-1. That the GPA Sampler from [1] is superior to randomly selecting additional points.
-2. That the Fast GPA Sampler computes the same points as the GPA Sampler from [1] while reducing the runtime.
+- Deep Ensembles thay cho MC Dropout.
+- Mỗi network dự đoán `mean` và `log_var`.
+- Loss là Gaussian Negative Log Likelihood.
+- Variance giữa các ensemble means là epistemic uncertainty.
+- `exp(log_var)` là aleatoric uncertainty.
+- Active learning chỉ dùng epistemic uncertainty để chọn điểm.
 
-## Usage
+Acquisition strategies đang có:
 
-To run the experiments, it is recommended to set up a virtualenv with python3.8 and install the requirements via
+- `random_sampling`: baseline ngẫu nhiên.
+- `greedy_variance`: chọn top epistemic variance.
+- `kmeans_variance`: lấy top `3 * batch_size` điểm variance cao, KMeans thành
+  `batch_size` cụm, rồi chọn điểm gần tâm cụm nhất.
 
+## Cấu trúc repo
+
+```text
+al_engine/              offline active learning engine
+  data/                 dataset loading and split
+  models/               Gaussian MLP and Deep Ensemble
+  strategies/           random, greedy variance, KMeans variance
+  experiment/           labeled/pool state manager
+  artifacts/            schema, writer, validator
+  analysis/             PCA embedding
+
+configs/                YAML configs for experiments and suites
+scripts/                CLI commands
+tests/                  unittest coverage and smoke experiment
+artifacts/runs/         Parquet/CSV source of truth, ignored except .gitkeep
+site/public/artifacts/  small static JSON bundle for the explainer site
+site/                   Vite + React static explainer
+docs/                   theory docs, experiment notes, workflow prompts
 ```
-virtualenv --python=python3.8 venv
-source venv/bin/activate
-pip install -r requirements.txt
+
+## Cài đặt
+
+Yêu cầu chính:
+
+- Python 3.10+.
+- Node.js 20+.
+- Trên Windows PowerShell, dùng `npm.cmd` nếu `npm.ps1` bị chặn bởi execution
+  policy.
+
+Tạo môi trường Python:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements-train.txt
 ```
 
-Afterwards the two example scripts can be called via
+Cài frontend:
 
+```powershell
+cd site
+npm.cmd ci
+cd ..
 ```
-python source/compare_gpa_rand.py
-python source/compare_fastgpa_batchgpa.py
+
+`requirements.txt` hiện chỉ trỏ tới `requirements-train.txt` để tiện cài nhanh
+phần engine.
+
+## Chạy nhanh toàn bộ project
+
+Hướng dẫn chi tiết từ chạy mô hình tới deploy Render nằm ở:
+
+```text
+docs/run_model_and_deploy_render.md
 ```
 
-The first script takes about 10min to run, the second less than 2min. Both create a results directory which contains a logfile, experiment configurations as well as a plot with the most important metrics.
+Luồng debug nhỏ, phù hợp để kiểm tra toàn bộ pipeline:
 
-The first script compares the GPA Sampler from [1] to random point selection. The results depend on the chosen random seed but in most cases using the GPA Sampler leads to a faster and more stable convergence.
+```powershell
+python scripts/run_suite.py --quick
+python scripts/validate_artifacts.py artifacts/runs
+python scripts/build_site_data.py
+npm.cmd --prefix site run build
+npm.cmd --prefix site run dev
+```
 
-The second script compares the Fast GPA Sampler to the GPA Sampler (from [1]). Both Samplers in theory compute the same posterior variance, however, sometimes differences in the convergence occur from rounding errors. In general, the Fast version of the sampler does the same job in shorter time as it avoids the repeated inversion of the posterior covariance matrix.
+Sau đó mở:
 
-To change the experimental setup, consider changing the parameter values (in particular random seed and train/pool/test sizes) in the python scripts and the .yaml configuration files in `configs/`.
+```text
+http://127.0.0.1:5173/
+```
 
-## Example Results from source/compare_gpa_rand.py
+Nếu chỉ muốn chạy một experiment nhỏ:
 
-![Example Results](images/result_script1.png)
+```powershell
+python scripts/run_experiment.py --config configs/quick_debug.yaml
+```
 
-## Example Results from source/compare_fastgpa_batchgpa.py
+## Chạy experiment
 
-![Example Results](images/result_script2.png)
+Chạy từng config:
 
-### References
+```powershell
+python scripts/run_experiment.py --config configs/california_random.yaml
+python scripts/run_experiment.py --config configs/california_greedy_variance.yaml
+python scripts/run_experiment.py --config configs/california_kmeans_variance.yaml
+```
 
-- [1] E. Tsymbalov, S. Makarychev, A. Shapeev, M. Panov, *Deeper Connections between Neural Networks and Gaussian Processes Speed-up Active Learning*, 2019, <https://arxiv.org/abs/1902.10350>
+Chạy suite so sánh strategies:
 
-- the code contained in `source/models/` is modified from:
+```powershell
+python scripts/run_suite.py --quick
+python scripts/run_suite.py
+```
 
-    [2] D. Hafner, D. Tran, T. Lillicrap, A. Irpan, J. Davidson, *Noise Contrastive Priors for Functional Uncertainty*, arXiv eprint 1807.09289, 2018, <https://github.com/brain-research/ncp>
+`--quick` dùng synthetic dataset nhỏ, ít model, ít epoch để smoke test. Lệnh
+không có `--quick` dùng các config California Housing đầy đủ hơn.
 
-- the AttrDict class in `source/classes/attrdict.py` is taken from:
+Output experiment nằm trong:
 
-    Danijar Hafner, *Patterns for Fast Prototyping with TensorFlow*, blog post, <https://danijar.com/patterns-for-fast-prototyping-with-tensorflow/>
+```text
+artifacts/runs/<run_id>/
+```
 
-## Original Project
+Mỗi run gồm:
 
-This repository is adapted from the original project by Lukas Erlenbach: <https://github.com/LukasErlenbach/active_learning_bnn>
+```text
+manifest.json
+config.yaml
+diagnostics.json
+metrics.csv
+metrics.json
+pca_embedding.parquet
+pca_embedding.json
+selection_trace.parquet
+selection_trace.json
+iterations/iteration_XXX.parquet
+iterations/iteration_XXX.json
+```
+
+Parquet/CSV trong `artifacts/runs/` là source of truth. Folder này bị ignore để
+tránh commit artifact lớn.
+
+## Build dữ liệu cho site
+
+Site không đọc Parquet trực tiếp. Trước khi chạy hoặc deploy site, build JSON
+bundle:
+
+```powershell
+python scripts/build_site_data.py
+```
+
+Output:
+
+```text
+site/public/artifacts/index.json
+site/public/artifacts/runs/<run_id>/manifest.json
+site/public/artifacts/runs/<run_id>/metrics.json
+site/public/artifacts/runs/<run_id>/pca_embedding.json
+site/public/artifacts/runs/<run_id>/selection_trace.json
+site/public/artifacts/runs/<run_id>/iterations/iteration_XXX.json
+```
+
+Bundle demo hiện nhỏ, có thể commit để Render hiển thị ngay mà không cần train.
+
+## Chạy website
+
+Dev server:
+
+```powershell
+npm.cmd --prefix site run dev
+```
+
+Build production:
+
+```powershell
+npm.cmd --prefix site run build
+```
+
+Preview production build:
+
+```powershell
+npm.cmd --prefix site run preview
+```
+
+## Deploy Render
+
+`render.yaml` dùng static site:
+
+```text
+runtime: static
+buildCommand: cd site && npm ci && npm run build
+staticPublishPath: site/dist
+```
+
+Render không cài `requirements-train.txt`, không cài Torch, và không train. Nếu
+muốn cập nhật dữ liệu trên site, chạy experiment offline, chạy
+`scripts/build_site_data.py`, rồi commit `site/public/artifacts/`.
+
+## Validation
+
+Trước khi commit hoặc deploy, chạy:
+
+```powershell
+python -B -m compileall al_engine scripts tests
+python -B -m unittest discover -s tests
+python scripts/run_experiment.py --config configs/quick_debug.yaml
+python scripts/validate_artifacts.py artifacts/runs
+python scripts/build_site_data.py
+npm.cmd --prefix site run build
+npm.cmd --prefix site audit --json
+```
+
+Các test hiện cover:
+
+- strategy selection,
+- uncertainty output shapes,
+- artifact validator,
+- smoke experiment synthetic.
+
+## Tài liệu lý thuyết
+
+- `docs/theory/active_learning.md`
+- `docs/theory/deep_ensemble.md`
+- `docs/theory/uncertainty_decomposition.md`
+- `docs/theory/gaussian_nll.md`
+- `docs/theory/acquisition_strategies.md`
+- `docs/experiment/mc_dropout_diagnostics.md`
+- `docs/run_model_and_deploy_render.md`

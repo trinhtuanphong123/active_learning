@@ -1,0 +1,37 @@
+run:
+  run_id: quick_debug
+  output_root: artifacts/runs
+
+dataset:
+  name: synthetic_regression
+  n_samples: 96
+  n_features: 4
+  noise: 0.1
+
+seed: 42
+
+split:
+  test_size: 24
+  scale_features: true
+
+active_learning:
+  initial_train_size: 8
+  acquisition_batch_size: 4
+  num_iterations: 1
+
+model:
+  type: deep_ensemble
+  num_models: 2
+  learning_rate: 0.001
+  max_epochs: 1
+  batch_size: 4
+  base_seed: 1729
+
+strategy:
+  name: kmeans_variance
+  params:
+    candidate_multiplier: 3
+    n_init: 2
+
+artifacts:
+  write_iteration_json: true

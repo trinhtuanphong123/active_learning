@@ -1,0 +1,30 @@
+run:
+  run_id: california_greedy_variance_seed42
+  output_root: artifacts/runs
+
+dataset:
+  name: california_housing
+
+seed: 42
+
+split:
+  test_size: 6000
+  scale_features: true
+
+active_learning:
+  initial_train_size: 100
+  acquisition_batch_size: 100
+  num_iterations: 20
+
+model:
+  type: deep_ensemble
+  num_models: 5
+  learning_rate: 0.001
+  max_epochs: 100
+  batch_size: 64
+  base_seed: 1729
+
+strategy:
+  name: greedy_variance
+  params: {}
+

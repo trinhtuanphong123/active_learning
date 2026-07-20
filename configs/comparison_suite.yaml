@@ -1,0 +1,31 @@
+suite:
+  name: california_strategy_comparison
+  description: Compare random, greedy variance, and K-Means variance acquisition.
+  configs:
+    - configs/california_random.yaml
+    - configs/california_greedy_variance.yaml
+    - configs/california_kmeans_variance.yaml
+  quick:
+    run_id_prefix: quick_
+    overrides:
+      dataset:
+        name: synthetic_regression
+        n_samples: 96
+        n_features: 4
+        noise: 0.1
+      split:
+        test_size: 24
+        scale_features: true
+      active_learning:
+        initial_train_size: 8
+        acquisition_batch_size: 4
+        num_iterations: 1
+      model:
+        type: deep_ensemble
+        num_models: 2
+        learning_rate: 0.001
+        max_epochs: 1
+        batch_size: 4
+        base_seed: 1729
+      artifacts:
+        write_iteration_json: false

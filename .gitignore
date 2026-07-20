@@ -1,0 +1,26 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node/site build output
+node_modules/
+site/node_modules/
+site/dist/
+
+# Local logs and env files
+*.log
+.env
+.env.*
+
+# Offline experiment outputs can be large. Commit site/public/artifacts for a
+# small static demo bundle when needed.
+artifacts/runs/*
+!artifacts/runs/.gitkeep
+export_data/
