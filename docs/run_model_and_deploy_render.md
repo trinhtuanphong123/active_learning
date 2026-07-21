@@ -111,6 +111,17 @@ Build JSON bundle:
 python scripts/build_site_data.py
 ```
 
+Mặc định script chọn một nhóm run so sánh nhất quán cho public site. Nghĩa là nếu
+`artifacts/runs/` đang có cả `quick_*` và full California runs, bundle deploy sẽ
+ưu tiên nhóm full California gồm Random, GreedyVariance và KMeansVariance. Cách
+này tránh lỗi chart bị trộn RMSE synthetic debug với RMSE California.
+
+Nếu bạn cần export mọi run để kiểm tra nội bộ:
+
+```powershell
+python scripts/build_site_data.py --all-runs
+```
+
 Output chính:
 
 ```text
@@ -125,7 +136,7 @@ site/public/artifacts/runs/<run_id>/iterations/iteration_XXX.json
 Quan trọng:
 
 - `artifacts/runs/` bị ignore vì có thể lớn.
-- `site/public/artifacts/` là bundle nhỏ để commit và deploy.
+- `site/public/artifacts/` là bundle đã downsample để commit và deploy.
 - Muốn Render hiển thị kết quả mới, phải commit `site/public/artifacts/` sau khi
   build lại.
 

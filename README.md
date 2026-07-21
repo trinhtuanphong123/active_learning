@@ -170,6 +170,15 @@ bundle:
 python scripts/build_site_data.py
 ```
 
+Mặc định script sẽ chọn một nhóm run có cùng dataset, seed, label budget và model
+config để tránh trộn quick debug với full experiment trên cùng biểu đồ. Khi đã có
+đủ full California runs, bundle public sẽ chỉ gồm 3 strategy chính: Random,
+GreedyVariance và KMeansVariance. Nếu muốn export toàn bộ run, kể cả quick/debug:
+
+```powershell
+python scripts/build_site_data.py --all-runs
+```
+
 Output:
 
 ```text
@@ -181,7 +190,8 @@ site/public/artifacts/runs/<run_id>/selection_trace.json
 site/public/artifacts/runs/<run_id>/iterations/iteration_XXX.json
 ```
 
-Bundle demo hiện nhỏ, có thể commit để Render hiển thị ngay mà không cần train.
+Bundle demo có thể commit để Render hiển thị ngay mà không cần train. Với full
+California suite, bundle JSON đã downsample vẫn có thể vài chục MB.
 
 ## Chạy website
 

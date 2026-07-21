@@ -1,0 +1,1 @@
+{"run_id":"california_kmeans_variance_seed42","dataset":"california_housing","strategy":"kmeans_variance","seed":42,"model":{"type":"deep_ensemble","num_models":5,"max_epochs":100,"loss":"gaussian_nll"},"active_learning":{"initial_train_size":100,"acquisition_batch_size":100,"num_iterations":20}}

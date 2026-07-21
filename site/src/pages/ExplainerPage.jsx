@@ -3,7 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ChapterNav } from "../components/ChapterNav.jsx";
 import { MetricStrip } from "../components/MetricStrip.jsx";
 import { RunControls, strategyLabel } from "../components/RunControls.jsx";
-import { getIterationState, getMetricForIteration } from "../data/charts.js";
+import {
+  getComparableRuns,
+  getIterationState,
+  getMetricForIteration,
+} from "../data/charts.js";
 import { formatNumber } from "../data/format.js";
 import { EnsembleDiagram } from "../scenes/EnsembleDiagram.jsx";
 import { KMeansExplanation } from "../scenes/KMeansExplanation.jsx";
@@ -42,6 +46,10 @@ export function ExplainerPage({ bundle, error, initialRunId, status }) {
     () => runs.find((run) => run.run_id === selectedRunId) ?? runs[0],
     [runs, selectedRunId],
   );
+  const comparableRuns = useMemo(
+    () => getComparableRuns(runs, selectedRun),
+    [runs, selectedRun],
+  );
   const maxIterationIndex = Math.max((selectedRun?.iterationStates?.length ?? 1) - 1, 0);
   const clampedIterationIndex = Math.min(iterationIndex, maxIterationIndex);
   const iterationState = getIterationState(selectedRun, clampedIterationIndex);
@@ -76,10 +84,10 @@ export function ExplainerPage({ bundle, error, initialRunId, status }) {
 
   const metricItems = [
     {
-      label: "runs",
-      value: bundle?.run_count ?? runs.length,
+      label: "strategies",
+      value: comparableRuns.length || bundle?.run_count || runs.length,
       precision: 0,
-      note: "artifact tĩnh",
+      note: selectedRun?.dataset ?? "artifact tĩnh",
     },
     {
       label: "nhãn",
@@ -186,9 +194,9 @@ export function ExplainerPage({ bundle, error, initialRunId, status }) {
           id="acquisition"
           title="Diversity quyết định batch có đáng tiền hay không."
         >
-          <StrategyComparison iterationIndex={clampedIterationIndex} runs={runs} />
+          <StrategyComparison iterationIndex={clampedIterationIndex} runs={comparableRuns} />
           <div className="strategy-grid">
-            {runs.map((run) => (
+            {comparableRuns.map((run) => (
               <article className="strategy-card" key={run.run_id}>
                 <span>{strategyLabel(run.strategy)}</span>
                 <strong>{formatNumber(run.final_test_rmse, 3)}</strong>
@@ -196,7 +204,7 @@ export function ExplainerPage({ bundle, error, initialRunId, status }) {
               </article>
             ))}
           </div>
-          <KMeansExplanation iterationIndex={clampedIterationIndex} runs={runs} />
+          <KMeansExplanation iterationIndex={clampedIterationIndex} runs={comparableRuns} />
         </Section>
 
         <Section eyebrow="Loop" id="loop" title="Tua qua từng vòng active learning.">
@@ -239,7 +247,7 @@ export function ExplainerPage({ bundle, error, initialRunId, status }) {
         </Section>
 
         <Section eyebrow="Results" id="results" title="So sánh learning curve.">
-          <ResultsChart currentIteration={clampedIterationIndex} runs={runs} />
+          <ResultsChart currentIteration={clampedIterationIndex} runs={comparableRuns} />
         </Section>
 
         <Section

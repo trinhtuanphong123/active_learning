@@ -52,8 +52,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-iteration-rows",
         type=int,
-        default=2500,
+        default=1200,
         help="Maximum rows per exported iteration JSON before downsampling.",
+    )
+    parser.add_argument(
+        "--all-runs",
+        action="store_true",
+        help="Export every valid run instead of the best comparable run group.",
     )
     parser.add_argument(
         "--no-clean",
@@ -79,6 +84,8 @@ def main() -> None:
     run_dirs = discover_run_dirs(runs_root)
     if not run_dirs:
         raise SystemExit(f"No run artifact directories found in: {runs_root}")
+    if not args.all_runs:
+        run_dirs = select_best_run_group(run_dirs)
 
     prepare_output_dir(output_root, clean=not args.no_clean)
 
@@ -122,6 +129,63 @@ def discover_run_dirs(runs_root: Path) -> list[Path]:
         for path in runs_root.iterdir()
         if path.is_dir() and (path / "manifest.json").exists()
     )
+
+
+def select_best_run_group(run_dirs: list[Path]) -> list[Path]:
+    """Select one comparable group for the public site bundle.
+
+    Quick smoke-test runs are useful locally, but mixing them with full California
+    runs makes the public charts misleading. Grouping by dataset/protocol keeps
+    the site focused on one apples-to-apples comparison.
+    """
+    grouped_runs: dict[str, list[tuple[Path, dict[str, Any]]]] = {}
+    for run_dir in run_dirs:
+        manifest = read_json(run_dir / "manifest.json")
+        grouped_runs.setdefault(run_protocol_key(manifest), []).append((run_dir, manifest))
+
+    best_group = max(grouped_runs.values(), key=run_group_score)
+    deduped_by_strategy: dict[str, tuple[Path, dict[str, Any]]] = {}
+    for run_dir, manifest in sorted(best_group, key=run_preference_score, reverse=True):
+        strategy = str(manifest.get("strategy", run_dir.name))
+        deduped_by_strategy.setdefault(strategy, (run_dir, manifest))
+
+    return sorted(path for path, _manifest in deduped_by_strategy.values())
+
+
+def run_protocol_key(manifest: dict[str, Any]) -> str:
+    """Return the comparison protocol represented by a run manifest."""
+    active_learning = dict(manifest.get("active_learning", {}))
+    model = dict(manifest.get("model", {}))
+    return "|".join(
+        [
+            str(manifest.get("dataset", "")),
+            str(manifest.get("seed", "")),
+            str(active_learning.get("initial_train_size", "")),
+            str(active_learning.get("acquisition_batch_size", "")),
+            str(active_learning.get("num_iterations", "")),
+            str(model.get("num_models", "")),
+            str(model.get("max_epochs", "")),
+        ]
+    )
+
+
+def run_group_score(group: list[tuple[Path, dict[str, Any]]]) -> tuple[int, int, int]:
+    """Rank groups by usefulness for the explainer site."""
+    strategies = {str(manifest.get("strategy", "")) for _run_dir, manifest in group}
+    manifest = group[0][1]
+    active_learning = dict(manifest.get("active_learning", {}))
+    iterations = int(active_learning.get("num_iterations", 0) or 0)
+    batch_size = int(active_learning.get("acquisition_batch_size", 0) or 0)
+    return (len(strategies), iterations, batch_size)
+
+
+def run_preference_score(run_item: tuple[Path, dict[str, Any]]) -> int:
+    """Rank duplicate strategy runs within one protocol."""
+    run_dir, manifest = run_item
+    active_learning = dict(manifest.get("active_learning", {}))
+    iterations = int(active_learning.get("num_iterations", 0) or 0)
+    debug_penalty = 1_000 if "quick_debug" in run_dir.name else 0
+    return iterations * 10_000 - debug_penalty
 
 
 def prepare_output_dir(output_root: Path, clean: bool) -> None:

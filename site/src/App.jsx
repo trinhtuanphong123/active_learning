@@ -45,9 +45,16 @@ export default function App() {
 }
 
 function chooseInitialRunId(runs) {
+  const rankedRuns = [...runs].sort((left, right) => {
+    const metricDiff = Number(right.metric_rows ?? 0) - Number(left.metric_rows ?? 0);
+    if (metricDiff !== 0) {
+      return metricDiff;
+    }
+    return Number(right.final_num_labeled ?? 0) - Number(left.final_num_labeled ?? 0);
+  });
   const preferred =
-    runs.find((run) => run.strategy === "kmeans_variance") ??
-    runs.find((run) => run.strategy === "greedy_variance") ??
-    runs[0];
+    rankedRuns.find((run) => run.strategy === "kmeans_variance") ??
+    rankedRuns.find((run) => run.strategy === "greedy_variance") ??
+    rankedRuns[0];
   return preferred?.run_id ?? "";
 }

@@ -1,1 +1,0 @@
-{"run_id":"quick_california_kmeans_variance_seed42","dataset":"synthetic_regression","strategy":"kmeans_variance","seed":42,"model":{"type":"deep_ensemble","num_models":2,"max_epochs":1,"loss":"gaussian_nll"},"active_learning":{"initial_train_size":8,"acquisition_batch_size":4,"num_iterations":1}}
